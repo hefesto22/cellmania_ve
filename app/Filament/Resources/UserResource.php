@@ -55,9 +55,14 @@ class UserResource extends Resource
                     ->required()
                     ->options(function () {
                         $query = Role::query();
+                        $user = Auth::user();
 
-                        if (Auth::user()?->roles->contains('name', 'Jefe')) {
-                            $query->whereNotIn('name', ['super_admin', 'Jefe']);
+                        if ($user?->roles->contains('name', 'Jefe')) {
+                            $query->whereNotIn('name', ['super_admin']);
+                        }
+
+                        if ($user?->roles->contains('name', 'Encargado')) {
+                            $query->whereNotIn('name', ['super_admin', 'Jefe', 'Encargado']);
                         }
 
                         return $query->pluck('name', 'id');
@@ -74,7 +79,7 @@ class UserResource extends Resource
                 Forms\Components\DateTimePicker::make('updated_at')
                     ->label('Actualizado el')
                     ->disabled(),
-                ]);
+            ]);
     }
 
     public static function table(Table $table): Table
@@ -98,18 +103,41 @@ class UserResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();
-
         $user = Auth::user();
 
-        if ($user && $user->roles->contains('name', 'Jefe')) {
+        if (!$user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        // Si es super_admin, ve todo
+        if ($user->roles->contains('name', 'super_admin')) {
+            return $query;
+        }
+
+        // Si es Jefe
+        if ($user->roles->contains('name', 'Jefe')) {
+            // IDs de usuarios creados por el jefe (normalmente encargados)
+            $encargadosIds = User::where('created_by', $user->id)->pluck('id');
+
+            return $query->where(function ($q) use ($user, $encargadosIds) {
+                $q->where('id', $user->id)
+                    ->orWhere('created_by', $user->id)
+                    ->orWhereIn('created_by', $encargadosIds);
+            });
+        }
+
+        // Si es Encargado
+        if ($user->roles->contains('name', 'Encargado')) {
             return $query->where(function ($q) use ($user) {
                 $q->where('id', $user->id)
                     ->orWhere('created_by', $user->id);
             });
         }
 
-        return $query;
+        // Otros roles, solo se ven a sí mismos
+        return $query->where('id', $user->id);
     }
+
 
     public static function getPages(): array
     {
