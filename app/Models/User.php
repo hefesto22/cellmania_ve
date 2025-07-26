@@ -61,12 +61,12 @@ class User extends Authenticatable
             ->implode('');
     }
 
-    public function sucursal()
-    {
-        return $this->belongsTo(Sucursal::class);
-    }
     public function creador()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+    public function telefonos()
+    {
+        return $this->hasMany(Telefono::class, 'usuario_id');
     }
 }

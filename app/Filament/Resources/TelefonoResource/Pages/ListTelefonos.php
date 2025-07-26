@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Filament\Resources\SucursalResource\Pages;
+namespace App\Filament\Resources\TelefonoResource\Pages;
 
-use App\Filament\Resources\SucursalResource;
+use App\Filament\Resources\TelefonoResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
-class ListSucursals extends ListRecords
+class ListTelefonos extends ListRecords
 {
-    protected static string $resource = SucursalResource::class;
+    protected static string $resource = TelefonoResource::class;
 
     protected function getHeaderActions(): array
     {

@@ -3,10 +3,10 @@
 namespace App\Policies;
 
 use App\Models\User;
-use App\Models\Sucursal;
+use App\Models\Telefono;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
-class SucursalPolicy
+class TelefonoPolicy
 {
     use HandlesAuthorization;
 
@@ -15,15 +15,15 @@ class SucursalPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->can('view_any_sucursal');
+        return $user->can('view_any_telefono');
     }
 
     /**
      * Determine whether the user can view the model.
      */
-    public function view(User $user, Sucursal $sucursal): bool
+    public function view(User $user, Telefono $telefono): bool
     {
-        return $user->can('view_sucursal');
+        return $user->can('view_telefono');
     }
 
     /**
@@ -31,23 +31,23 @@ class SucursalPolicy
      */
     public function create(User $user): bool
     {
-        return $user->can('create_sucursal');
+        return $user->can('create_telefono');
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, Sucursal $sucursal): bool
+    public function update(User $user, Telefono $telefono): bool
     {
-        return $user->can('update_sucursal');
+        return $user->can('update_telefono');
     }
 
     /**
      * Determine whether the user can delete the model.
      */
-    public function delete(User $user, Sucursal $sucursal): bool
+    public function delete(User $user, Telefono $telefono): bool
     {
-        return $user->can('delete_sucursal');
+        return $user->can('delete_telefono');
     }
 
     /**
@@ -55,15 +55,15 @@ class SucursalPolicy
      */
     public function deleteAny(User $user): bool
     {
-        return $user->can('delete_any_sucursal');
+        return $user->can('delete_any_telefono');
     }
 
     /**
      * Determine whether the user can permanently delete.
      */
-    public function forceDelete(User $user, Sucursal $sucursal): bool
+    public function forceDelete(User $user, Telefono $telefono): bool
     {
-        return $user->can('force_delete_sucursal');
+        return $user->can('force_delete_telefono');
     }
 
     /**
@@ -71,15 +71,15 @@ class SucursalPolicy
      */
     public function forceDeleteAny(User $user): bool
     {
-        return $user->can('force_delete_any_sucursal');
+        return $user->can('force_delete_any_telefono');
     }
 
     /**
      * Determine whether the user can restore.
      */
-    public function restore(User $user, Sucursal $sucursal): bool
+    public function restore(User $user, Telefono $telefono): bool
     {
-        return $user->can('restore_sucursal');
+        return $user->can('restore_telefono');
     }
 
     /**
@@ -87,15 +87,15 @@ class SucursalPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('restore_any_sucursal');
+        return $user->can('restore_any_telefono');
     }
 
     /**
      * Determine whether the user can replicate.
      */
-    public function replicate(User $user, Sucursal $sucursal): bool
+    public function replicate(User $user, Telefono $telefono): bool
     {
-        return $user->can('replicate_sucursal');
+        return $user->can('replicate_telefono');
     }
 
     /**
@@ -103,6 +103,6 @@ class SucursalPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('reorder_sucursal');
+        return $user->can('reorder_telefono');
     }
 }
