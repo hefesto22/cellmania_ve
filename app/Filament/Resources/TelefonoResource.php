@@ -12,6 +12,8 @@ use Filament\Forms\Components\{TextInput, Select, Hidden};
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Builder;
+use App\Models\Accesorio;
+use App\Filament\Resources\TelefonoResource\RelationManagers\AccesoriosRelationManager;
 
 class TelefonoResource extends Resource
 {
@@ -25,15 +27,42 @@ class TelefonoResource extends Resource
     public static function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([
-            TextInput::make('marca')->required()->maxLength(50),
+            Select::make('marca_id')
+                ->label('Marca')
+                ->relationship('marca', 'nombre')
+                ->searchable()
+                ->preload()
+                ->required(),
+            Select::make('categoria_id')
+                ->label('Categoría')
+                ->relationship('categoria', 'nombre')
+                ->searchable()
+                ->preload()
+                ->required(),
+
             TextInput::make('modelo')->required()->maxLength(50),
-            TextInput::make('almacenamiento')->required(),
-            TextInput::make('ram')->required(),
+            TextInput::make('almacenamiento')
+                ->label('Almacenamiento (GB)')
+                ->numeric()
+                ->required(),
+
+            TextInput::make('ram')
+                ->label('RAM (GB)')
+                ->numeric()
+                ->required(),
+
             TextInput::make('color')->maxLength(30),
             TextInput::make('precio_compra')->required()->numeric(),
             TextInput::make('precio_venta')->required()->numeric(),
+            TextInput::make('isv') // 👈 Campo nuevo
+                ->label('ISV (%)')
+                ->numeric()
+                ->default(15.00)
+                ->required(),
             TextInput::make('stock')->required()->numeric()->minValue(0),
             TextInput::make('codigo_barras')->required()->unique(ignoreRecord: true),
+            TextInput::make('imei')->label('IMEI')->maxLength(30),
+
             Select::make('estado')
                 ->required()
                 ->options([
@@ -43,7 +72,6 @@ class TelefonoResource extends Resource
                     'Inactivo' => 'Inactivo',
                 ])
                 ->default('Disponible'),
-            // ✅ usuario_id se asigna automáticamente en mutateFormData, no se necesita aquí
         ]);
     }
 
@@ -51,12 +79,14 @@ class TelefonoResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('marca')->searchable()->sortable(),
+                TextColumn::make('marca.nombre')->label('Marca')->sortable()->searchable(),
+
                 TextColumn::make('modelo')->searchable(),
                 TextColumn::make('almacenamiento'),
                 TextColumn::make('ram'),
-                TextColumn::make('stock')->sortable(),
                 TextColumn::make('precio_venta')->money('USD'),
+                TextColumn::make('isv')->label('ISV (%)'), // 👈 Campo nuevo
+                TextColumn::make('stock')->sortable(),
                 TextColumn::make('estado')
                     ->badge()
                     ->color(fn(string $state): string => match ($state) {
@@ -68,7 +98,7 @@ class TelefonoResource extends Resource
                     })
                     ->sortable(),
                 TextColumn::make('codigo_barras')->label('Código')->searchable(),
-                // ❌ Eliminado: TextColumn::make('sucursal.nombre')
+                TextColumn::make('imei')->label('IMEI')->searchable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('estado')
@@ -100,31 +130,40 @@ class TelefonoResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $user = Auth::user();
-
-        // Relación anticipada solo con usuario
         $query = parent::getEloquentQuery()->with('usuario');
 
-        // Jefe ve todo
-        if ($user->role === 'Jefe') {
-            return $query;
+        $roleName = $user->roles->first()?->name;
+
+        // Jefe ve lo que él y los usuarios que él registró hayan hecho
+        if ($roleName === 'Jefe') {
+            $subUserIds = \App\Models\User::where('created_by', $user->id)->pluck('id');
+            return $query->whereIn('usuario_id', $subUserIds->push($user->id));
         }
 
         // Encargado ve sus registros y los de sus vendedores
-        if ($user->created_by === null) {
-            $vendedorIds = User::where('created_by', $user->id)->pluck('id')->toArray();
-
+        if ($roleName === 'Encargado') {
+            $vendedorIds = \App\Models\User::where('created_by', $user->id)->pluck('id');
             return $query->where(function ($q) use ($user, $vendedorIds) {
                 $q->where('usuario_id', $user->id)
                     ->orWhereIn('usuario_id', $vendedorIds);
             });
         }
 
-        // Vendedor ve sus registros y los del encargado
-        $encargadoId = $user->created_by;
+        // Vendedor ve lo suyo y lo del encargado que lo creó
+        if ($roleName === 'Vendedor') {
+            return $query->where(function ($q) use ($user) {
+                $q->where('usuario_id', $user->id)
+                    ->orWhere('usuario_id', $user->created_by);
+            });
+        }
 
-        return $query->where(function ($q) use ($user, $encargadoId) {
-            $q->where('usuario_id', $user->id)
-                ->orWhere('usuario_id', $encargadoId);
-        });
+        // Si no tiene rol definido, no ve nada
+        return $query->whereNull('id');
+    }
+    public static function getRelations(): array
+    {
+        return [
+            AccesoriosRelationManager::class,
+        ];
     }
 }

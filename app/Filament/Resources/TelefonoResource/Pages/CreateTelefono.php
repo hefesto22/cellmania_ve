@@ -12,7 +12,18 @@ class CreateTelefono extends CreateRecord
     protected static string $resource = TelefonoResource::class;
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['usuario_id'] = Auth::id(); // ✅ Asignar el usuario actual
+        $data['usuario_id'] = Auth::id();
+
+        // Limpiar valores previos si ya contienen "GB"
+        $ram = preg_replace('/\D/', '', $data['ram']) . 'GB';
+        $almacenamiento = preg_replace('/\D/', '', $data['almacenamiento']) . 'GB';
+
+        // Concatenar modelo completo
+        $data['modelo'] = "{$data['modelo']} {$ram} RAM {$almacenamiento}";
+
+        // Guardar valores ya formateados
+        $data['ram'] = $ram;
+        $data['almacenamiento'] = $almacenamiento;
 
         return $data;
     }

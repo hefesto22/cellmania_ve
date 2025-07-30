@@ -16,4 +16,15 @@ class EditTelefono extends EditRecord
             Actions\DeleteAction::make(),
         ];
     }
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        $ram = preg_replace('/\D/', '', $data['ram']) . 'GB';
+        $almacenamiento = preg_replace('/\D/', '', $data['almacenamiento']) . 'GB';
+
+        $data['modelo'] = "{$data['modelo']} {$ram} RAM {$almacenamiento}";
+        $data['ram'] = $ram;
+        $data['almacenamiento'] = $almacenamiento;
+
+        return $data;
+    }
 }
