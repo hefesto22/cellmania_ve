@@ -105,7 +105,6 @@
                                                     <x-filament::button size="sm" color="danger"
                                                         wire:click="quitarDelCarrito('{{ $item['uid'] }}')">✕</x-filament::button>
                                                 @endif
-
                                             </td>
                                         </tr>
                                     @endif

@@ -10,6 +10,9 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\Builder;
+use App\Models\User;
+
 
 class MarcaResource extends Resource
 {
@@ -27,7 +30,7 @@ class MarcaResource extends Resource
                 ->maxLength(50),
 
             Forms\Components\Hidden::make('created_by')
-                ->default(fn () => Auth::user()?->id)
+                ->default(fn() => Auth::user()?->id)
                 ->required()
                 ->visibleOn('create'),
         ]);
@@ -60,5 +63,19 @@ class MarcaResource extends Resource
             'create' => Pages\CreateMarca::route('/create'),
             'edit' => Pages\EditMarca::route('/{record}/edit'),
         ];
+    }
+    public static function getEloquentQuery(): Builder
+    {
+        $auth = Auth::user();
+
+        if (in_array($auth->role_id, [1, 2])) {
+            $userIds = User::where('created_by', $auth->id)
+                ->pluck('id')
+                ->push($auth->id);
+
+            return parent::getEloquentQuery()->whereIn('created_by', $userIds);
+        }
+
+        return parent::getEloquentQuery()->where('created_by', $auth->id);
     }
 }

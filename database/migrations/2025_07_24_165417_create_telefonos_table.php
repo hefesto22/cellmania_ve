@@ -11,18 +11,23 @@ return new class extends Migration
         // Tabla categorías
         Schema::create('categorias', function (Blueprint $table) {
             $table->id();
-            $table->string('nombre')->unique();
+            $table->string('nombre');
             $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
             $table->timestamps();
+
+            $table->unique(['nombre', 'created_by']); // índice único compuesto
         });
 
         // Tabla marcas
         Schema::create('marcas', function (Blueprint $table) {
             $table->id();
-            $table->string('nombre')->unique();
+            $table->string('nombre');
             $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
             $table->timestamps();
+
+            $table->unique(['nombre', 'created_by']); // índice único compuesto
         });
+
 
         // Tabla accesorios
         // Tabla accesorios

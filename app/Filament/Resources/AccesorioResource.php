@@ -29,17 +29,26 @@ class AccesorioResource extends Resource
             Forms\Components\TextInput::make('codigo_barras')->required()->unique(ignoreRecord: true),
             Forms\Components\Select::make('marca_id')
                 ->label('Marca')
-                ->options(fn() => Marca::limit(5)->pluck('nombre', 'id'))
+                ->options(function () {
+                    $auth = Auth::user();
+                    $ids = collect([$auth->id, $auth->created_by])->filter()->unique();
+                    return Marca::whereIn('created_by', $ids)->pluck('nombre', 'id');
+                })
                 ->searchable()
                 ->preload()
                 ->required(),
 
             Forms\Components\Select::make('categoria_id')
                 ->label('Categoría')
-                ->options(fn() => Categoria::limit(5)->pluck('nombre', 'id'))
+                ->options(function () {
+                    $auth = Auth::user();
+                    $ids = collect([$auth->id, $auth->created_by])->filter()->unique();
+                    return Categoria::whereIn('created_by', $ids)->pluck('nombre', 'id');
+                })
                 ->searchable()
                 ->preload()
                 ->required(),
+
 
             Forms\Components\TextInput::make('precio_compra')->numeric()->required(),
             Forms\Components\TextInput::make('precio_venta')->numeric()->required(),
@@ -106,5 +115,16 @@ class AccesorioResource extends Resource
             'create' => Pages\CreateAccesorio::route('/create'),
             'edit' => Pages\EditAccesorio::route('/{record}/edit'),
         ];
+    }
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        $auth = Auth::user();
+
+        // IDs válidos: el mismo usuario + los que él registró
+        $userIds = \App\Models\User::where('created_by', $auth->id)
+            ->pluck('id')
+            ->push($auth->id);
+
+        return parent::getEloquentQuery()->whereIn('created_by', $userIds);
     }
 }

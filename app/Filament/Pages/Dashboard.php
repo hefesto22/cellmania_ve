@@ -55,8 +55,8 @@ class Dashboard extends Page implements HasTable
                 'id',
                 DB::raw("'telefono' as tipo"),
                 DB::raw("modelo as nombre"),
-
                 'precio_venta',
+                'precio_compra', // 👈 Agregado
                 'isv',
                 'stock',
                 'codigo_barras',
@@ -64,6 +64,7 @@ class Dashboard extends Page implements HasTable
             ])
             ->whereIn('usuario_id', $idsPermitidos)
             ->where('stock', '>', 0);
+
 
         // Accesorios
         $accesorios = DB::table('accesorios')
@@ -73,6 +74,7 @@ class Dashboard extends Page implements HasTable
                 DB::raw("'accesorio' as tipo"),
                 'nombre',
                 'precio_venta',
+                'precio_compra', // 👈 Agregado
                 'isv',
                 'stock',
                 'codigo_barras',
@@ -80,6 +82,7 @@ class Dashboard extends Page implements HasTable
             ])
             ->whereIn('created_by', $idsPermitidos)
             ->where('stock', '>', 0);
+
 
         // Unión
         $union = $telefonos->unionAll($accesorios);
@@ -190,10 +193,28 @@ class Dashboard extends Page implements HasTable
     #[\Livewire\Attributes\On('quitarDelCarrito')]
     public function quitarDelCarrito($uid): void
     {
+        // Eliminar el producto principal
         unset($this->carrito[$uid]);
+
+        // Si es un teléfono, eliminar sus accesorios relacionados
+        if (str_starts_with($uid, 'telefono-')) {
+            $telefonoId = (int) str_replace('telefono-', '', $uid);
+
+            // Obtener todos los IDs de accesorios relacionados desde la tabla accesorio_telefono
+            $accesorioIds = \Illuminate\Support\Facades\DB::table('accesorio_telefono')
+                ->where('telefono_id', $telefonoId)
+                ->pluck('id'); // ✅ usamos el ID propio de la tabla accesorio_telefono
+
+            foreach ($accesorioIds as $accId) {
+                $accUid = "accesorio-{$accId}";
+                unset($this->carrito[$accUid]);
+            }
+        }
+
         session()->put('carrito', $this->carrito);
         $this->dispatch('$refresh');
     }
+
     public function descartarVenta(): void
     {
         $this->carrito = [];
@@ -244,6 +265,7 @@ class Dashboard extends Page implements HasTable
                         'cantidad' => $actual + 1,
                         'precio'   => $record->precio_venta,
                         'isv'      => $record->isv,
+                        'costo' => $record->precio_compra, // 👈 MUY IMPORTANTE
                     ];
 
                     // Si es un teléfono, agrega sus accesorios relacionados
@@ -267,6 +289,7 @@ class Dashboard extends Page implements HasTable
                                         'cantidad' => $accActual + 1,
                                         'precio'   => $accesorio->precio_venta,
                                         'isv'      => $accesorio->isv,
+                                        'costo' => $accesorio->precio_compra, // 👈 MUY IMPORTANTE
                                         'fijo'     => true,
                                     ];
                                 }

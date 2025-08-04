@@ -13,6 +13,9 @@ use Filament\Forms\Components\{TextInput, DatePicker, FileUpload, Section, Grid,
 use Filament\Tables\Columns\{TextColumn, ImageColumn};
 use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Actions\{ViewAction, EditAction, DeleteAction, ActionGroup};
+use Illuminate\Database\Eloquent\Builder;
+use App\Models\User;
+
 
 
 class DatosEmpresaResource extends Resource
@@ -93,5 +96,30 @@ class DatosEmpresaResource extends Resource
             'create' => Pages\CreateDatosEmpresa::route('/crear'),
             'edit' => Pages\EditDatosEmpresa::route('/{record}/editar'),
         ];
+    }
+    public static function getEloquentQuery(): Builder
+    {
+        $auth = Auth::user();
+
+        // Admin y Supervisor (roles 1 y 2) ven lo suyo y lo de los usuarios que registraron
+        if (in_array($auth->role_id, [1, 2])) {
+            $userIds = User::where('created_by', $auth->id)
+                ->pluck('id')
+                ->push($auth->id);
+
+            return parent::getEloquentQuery()->whereIn('user_id', $userIds);
+        }
+
+        // Encargado (rol 3): lo suyo + usuarios que él registró
+        if ($auth->role_id === 3) {
+            $userIds = User::where('created_by', $auth->id)
+                ->pluck('id')
+                ->push($auth->id);
+
+            return parent::getEloquentQuery()->whereIn('user_id', $userIds);
+        }
+
+        // Otros usuarios: solo lo suyo
+        return parent::getEloquentQuery()->where('user_id', $auth->id);
     }
 }

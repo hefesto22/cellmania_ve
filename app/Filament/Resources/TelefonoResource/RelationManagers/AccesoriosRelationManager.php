@@ -10,6 +10,7 @@ use Filament\Tables\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Forms\Components\Select;
+use Illuminate\Support\Facades\Auth;
 
 class AccesoriosRelationManager extends RelationManager
 {
@@ -32,10 +33,19 @@ class AccesoriosRelationManager extends RelationManager
                     ->form([
                         Select::make('accesorio_id')
                             ->label('Seleccionar accesorio')
-                            ->options(Accesorio::where('stock', '>', 0)->pluck('nombre', 'id'))
+                            ->options(function () {
+                                $auth = Auth::user(); // ✅ así como lo estás trabajando tú
+
+                                $ids = collect([$auth->id, $auth->created_by])->filter()->unique();
+
+                                return Accesorio::where('stock', '>', 0)
+                                    ->whereIn('created_by', $ids)
+                                    ->pluck('nombre', 'id');
+                            })
                             ->searchable()
                             ->required(),
                     ])
+
 
                     ->action(function (array $data) {
                         $accesorio = Accesorio::findOrFail($data['accesorio_id']);

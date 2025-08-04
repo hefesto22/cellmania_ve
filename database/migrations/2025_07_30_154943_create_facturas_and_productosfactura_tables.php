@@ -40,7 +40,7 @@ return new class extends Migration
         // Tabla de facturas
         Schema::create('facturas', function (Blueprint $table) {
             $table->id();
-            $table->string('numero_factura')->unique();
+            $table->string('numero_factura'); // ❌ sin unique aquí
             $table->string('cai')->nullable();
             $table->timestamp('fecha_emision')->useCurrent();
 
@@ -65,7 +65,11 @@ return new class extends Migration
                 ->nullOnDelete();
 
             $table->timestamps();
+
+            // ✅ Índice único compuesto
+            $table->unique(['user_id', 'numero_factura']);
         });
+
 
         // Tabla de productos en la factura
         Schema::create('productosfactura', function (Blueprint $table) {

@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Builder;
 use App\Models\Accesorio;
 use App\Filament\Resources\TelefonoResource\RelationManagers\AccesoriosRelationManager;
+use App\Models\Marca;
+use App\Models\Categoria;
 
 class TelefonoResource extends Resource
 {
@@ -29,13 +31,22 @@ class TelefonoResource extends Resource
         return $form->schema([
             Select::make('marca_id')
                 ->label('Marca')
-                ->relationship('marca', 'nombre')
+                ->options(function () {
+                    $auth = Auth::user();
+                    $ids = collect([$auth->id, $auth->created_by])->filter()->unique();
+                    return Marca::whereIn('created_by', $ids)->pluck('nombre', 'id');
+                })
                 ->searchable()
                 ->preload()
                 ->required(),
+
             Select::make('categoria_id')
                 ->label('Categoría')
-                ->relationship('categoria', 'nombre')
+                ->options(function () {
+                    $auth = Auth::user();
+                    $ids = collect([$auth->id, $auth->created_by])->filter()->unique();
+                    return Categoria::whereIn('created_by', $ids)->pluck('nombre', 'id');
+                })
                 ->searchable()
                 ->preload()
                 ->required(),
