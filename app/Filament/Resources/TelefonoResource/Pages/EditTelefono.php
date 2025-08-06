@@ -18,13 +18,24 @@ class EditTelefono extends EditRecord
     }
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $ram = preg_replace('/\D/', '', $data['ram']) . 'GB';
-        $almacenamiento = preg_replace('/\D/', '', $data['almacenamiento']) . 'GB';
+        // Extraer valores numéricos, aunque el usuario escriba "12 GB" o "12gb"
+        $ramNum = (int) filter_var($data['ram'], FILTER_SANITIZE_NUMBER_INT);
+        $almacenamientoNum = (int) filter_var($data['almacenamiento'], FILTER_SANITIZE_NUMBER_INT);
 
-        $data['modelo'] = "{$data['modelo']} {$ram} RAM {$almacenamiento}";
+        // Formato correcto
+        $ram = "{$ramNum}GB";
+        $almacenamiento = "{$almacenamientoNum}GB";
+
+        // Limpiar el modelo anterior eliminando cualquier parte tipo: "128GB RAM 8GB"
+        $modeloBase = preg_replace('/\s*\d+GB\s*RAM\s*\d+GB$/i', '', $data['modelo']);
+
+        // Reconstruir modelo
+        $data['modelo'] = trim($modeloBase) . " {$almacenamiento} RAM {$ram}";
+
+        // Actualizar campos formateados
         $data['ram'] = $ram;
         $data['almacenamiento'] = $almacenamiento;
-
+        $data['stock'] = 1;
         return $data;
     }
 }

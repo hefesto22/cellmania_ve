@@ -16,6 +16,8 @@ use App\Models\Accesorio;
 use App\Filament\Resources\TelefonoResource\RelationManagers\AccesoriosRelationManager;
 use App\Models\Marca;
 use App\Models\Categoria;
+use Filament\Tables\Filters\SelectFilter;
+
 
 class TelefonoResource extends Resource
 {
@@ -25,6 +27,7 @@ class TelefonoResource extends Resource
     protected static ?string $navigationLabel = 'Teléfonos';
     protected static ?string $pluralModelLabel = 'Teléfonos';
     protected static ?string $modelLabel = 'Teléfono';
+    protected static ?string $navigationGroup = 'Productos';
 
     public static function form(Forms\Form $form): Forms\Form
     {
@@ -55,26 +58,33 @@ class TelefonoResource extends Resource
             TextInput::make('almacenamiento')
                 ->label('Almacenamiento (GB)')
                 ->numeric()
-                ->required(),
+                ->required()
+                ->formatStateUsing(fn($state) => preg_replace('/\D/', '', $state)) // solo el número
+                ->dehydrateStateUsing(fn($state) => $state . 'GB'), // se guarda con "GB"
 
             TextInput::make('ram')
                 ->label('RAM (GB)')
                 ->numeric()
-                ->required(),
+                ->required()
+                ->formatStateUsing(fn($state) => preg_replace('/\D/', '', $state))
+                ->dehydrateStateUsing(fn($state) => $state . 'GB'),
+
 
             TextInput::make('color')->maxLength(30),
             TextInput::make('precio_compra')->required()->numeric(),
             TextInput::make('precio_venta')->required()->numeric(),
-            TextInput::make('isv') // 👈 Campo nuevo
+            TextInput::make('isv')
                 ->label('ISV (%)')
                 ->numeric()
-                ->default(15.00)
+                ->default(0) // ✅ ahora por defecto 0
                 ->required(),
-            TextInput::make('stock')->required()->numeric()->minValue(0),
-            TextInput::make('codigo_barras')->required()->unique(ignoreRecord: true),
+            //TextInput::make('stock')->required()->numeric()->minValue(0),
             TextInput::make('imei')->label('IMEI')->maxLength(30),
+            TextInput::make('codigo_barras')->required()->unique(ignoreRecord: true),
+
 
             Select::make('estado')
+                ->label('Estado')
                 ->required()
                 ->options([
                     'Disponible' => 'Disponible',
@@ -82,7 +92,7 @@ class TelefonoResource extends Resource
                     'Reservado' => 'Reservado',
                     'Inactivo' => 'Inactivo',
                 ])
-                ->default('Disponible'),
+                ->visible(fn() => request()->routeIs('filament.admin.resources.telefonos.edit')),
         ]);
     }
 
@@ -119,7 +129,29 @@ class TelefonoResource extends Resource
                         'Reservado' => 'Reservado',
                         'Inactivo' => 'Inactivo',
                     ]),
+
+                // Filtro por encargado (solo para Jefe)
+                SelectFilter::make('encargado')
+                    ->label('Filtrar por Encargado')
+                    ->visible(function () {
+                        /** @var \App\Models\User $user */
+                        $user = Auth::user();
+                        return $user->hasRole('Jefe');
+                    })
+
+                    ->options(function () {
+                        $user = Auth::user();
+
+                        return User::where('created_by', $user->id)
+                            ->whereHas('roles', fn($q) => $q->where('name', 'Encargado'))
+                            ->pluck('name', 'id');
+                    })
+                    ->query(function (Builder $query, $state) {
+                        return $query->where('usuario_id', $state); // ✅ No se llama $value, sino $state
+                    }),
+
             ])
+
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
@@ -142,35 +174,40 @@ class TelefonoResource extends Resource
     {
         $user = Auth::user();
         $query = parent::getEloquentQuery()->with('usuario');
-
         $roleName = $user->roles->first()?->name;
 
-        // Jefe ve lo que él y los usuarios que él registró hayan hecho
+        $filters = request()->input('tableFilters', []);
+
+        // Detectar si el filtro de estado está activo
+        $filtradoPorEstado = isset($filters['estado']) && !empty($filters['estado']['value']);
+
         if ($roleName === 'Jefe') {
             $subUserIds = \App\Models\User::where('created_by', $user->id)->pluck('id');
-            return $query->whereIn('usuario_id', $subUserIds->push($user->id));
-        }
-
-        // Encargado ve sus registros y los de sus vendedores
-        if ($roleName === 'Encargado') {
+            $query->whereIn('usuario_id', $subUserIds->push($user->id));
+        } elseif ($roleName === 'Encargado') {
             $vendedorIds = \App\Models\User::where('created_by', $user->id)->pluck('id');
-            return $query->where(function ($q) use ($user, $vendedorIds) {
+            $query->where(function ($q) use ($user, $vendedorIds) {
                 $q->where('usuario_id', $user->id)
                     ->orWhereIn('usuario_id', $vendedorIds);
             });
-        }
-
-        // Vendedor ve lo suyo y lo del encargado que lo creó
-        if ($roleName === 'Vendedor') {
-            return $query->where(function ($q) use ($user) {
+        } elseif ($roleName === 'Vendedor') {
+            $query->where(function ($q) use ($user) {
                 $q->where('usuario_id', $user->id)
                     ->orWhere('usuario_id', $user->created_by);
             });
+        } else {
+            return $query->whereNull('id');
         }
 
-        // Si no tiene rol definido, no ve nada
-        return $query->whereNull('id');
+        // 👇 Aplicar condición para ocultar "Vendido" solo si no está filtrando explícitamente por estado
+        if (! $filtradoPorEstado) {
+            $query->where('estado', '!=', 'Vendido');
+        }
+
+        return $query->orderByRaw('stock = 0');
     }
+
+
     public static function getRelations(): array
     {
         return [

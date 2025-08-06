@@ -27,4 +27,33 @@
 
         {{ $this->table }}
     </div>
+    @php
+        $user = auth()->user();
+        $inversion = $this->getInversionPorTipo();
+    @endphp
+
+    @if (!method_exists($user, 'hasRole') || !$user->hasRole('Encargado'))
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {{-- Inversión en Teléfonos --}}
+            <div class="bg-white shadow rounded-lg p-4">
+                <div class="text-sm text-gray-600">Inversión en Teléfonos</div>
+                <div class="text-2xl font-bold">L {{ number_format($inversion['telefonos'], 2) }}</div>
+            </div>
+
+            {{-- Inversión en Accesorios Individuales --}}
+            <div class="bg-white shadow rounded-lg p-4">
+                <div class="text-sm text-gray-600">Inversión en Accesorios</div>
+                <div class="text-2xl font-bold">L {{ number_format($inversion['accesorios'], 2) }}</div>
+            </div>
+
+            {{-- Inversión en Accesorios de Teléfonos --}}
+            <div class="bg-white shadow rounded-lg p-4">
+                <div class="text-sm text-gray-600">Inversión en Accesorios de Teléfonos</div>
+                <div class="text-2xl font-bold">L {{ number_format($inversion['accesorios_telefono'], 2) }}</div>
+            </div>
+        </div>
+    @endif
+
+
+
 </x-filament-panels::page>

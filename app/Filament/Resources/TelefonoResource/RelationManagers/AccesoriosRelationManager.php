@@ -71,7 +71,9 @@ class AccesoriosRelationManager extends RelationManager
                             'stock'          => 1,
                         ]);
 
-                        $accesorio->decrement('stock');
+                        $accesorio->stock -= 1;
+                        $accesorio->save(); // 🔥 Esto sí ejecuta el observer y actualiza estado
+
 
                         Notification::make()
                             ->title('Accesorio asignado')

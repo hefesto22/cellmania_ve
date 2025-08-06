@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\TelefonoResource\Pages;
 
+use Filament\Pages\Actions\Concerns\InteractsWithTable;
+
 use App\Filament\Resources\TelefonoResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
@@ -16,4 +18,5 @@ class ListTelefonos extends ListRecords
             Actions\CreateAction::make(),
         ];
     }
+    
 }

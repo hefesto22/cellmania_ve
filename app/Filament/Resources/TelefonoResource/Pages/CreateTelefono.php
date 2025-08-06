@@ -13,7 +13,9 @@ class CreateTelefono extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['usuario_id'] = Auth::id();
+        $data['stock'] = 1;
 
+        $data['estado'] = 'Disponible';
         // Limpiar valores previos si ya contienen "GB"
         $ram = preg_replace('/\D/', '', $data['ram']) . 'GB';
         $almacenamiento = preg_replace('/\D/', '', $data['almacenamiento']) . 'GB';

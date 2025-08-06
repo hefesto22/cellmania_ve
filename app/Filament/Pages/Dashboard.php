@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\Factura;
 use App\Models\DatosEmpresa;
 use App\Models\ProductoFactura;
+use Spatie\Permission\Traits\HasRoles;
 
 use Filament\Notifications\Notification;
 
@@ -29,23 +30,32 @@ class Dashboard extends Page implements HasTable
 
     public function getTableQuery(): Builder
     {
-        $auth = Auth::user();
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
 
-        if ($auth->role_id === 1) {
-            $idsPermitidos = User::pluck('id')->toArray();
-        } elseif ($auth->role_id === 2) {
-            $subIds = User::where('created_by', $auth->id)->pluck('id')->toArray();
-            $idsPermitidos = array_merge([$auth->id], $subIds);
-        } elseif ($auth->role_id === 3) {
-            $propietarioId = $auth->created_by;
+        if ($user->hasRole('super_admin')) {
+            $idsPermitidos = \App\Models\User::pluck('id')->toArray();
+        } elseif ($user->hasRole('Jefe')) {
+            $subIds = \App\Models\User::where('created_by', $user->id)->pluck('id')->toArray();
+            $idsPermitidos = array_merge([$user->id], $subIds);
+        } elseif ($user->hasRole('Encargado')) {
+            $propietarioId = $user->created_by;
+
+            // Solo incluir compañeros que sean vendedores (rol_id = 4)
             $companerosIds = User::where('created_by', $propietarioId)
-                ->where('id', '!=', $auth->id)
+                ->where('id', '!=', $user->id)
+                ->get()
+                ->filter(fn($u) => $u->hasRole('Vendedor')) // ✅ Usa Spatie
                 ->pluck('id')
                 ->toArray();
 
-            $idsPermitidos = [$auth->id, $propietarioId, ...$companerosIds];
+
+            $idsPermitidos = [$user->id, $propietarioId, ...$companerosIds];
+        } elseif ($user->hasRole('Vendedor')) {
+            $encargadoId = $user->created_by;
+            $idsPermitidos = array_filter([$user->id, $encargadoId]);
         } else {
-            $idsPermitidos = [$auth->id];
+            $idsPermitidos = [$user->id];
         }
 
         // Teléfonos
@@ -56,7 +66,7 @@ class Dashboard extends Page implements HasTable
                 DB::raw("'telefono' as tipo"),
                 DB::raw("modelo as nombre"),
                 'precio_venta',
-                'precio_compra', // 👈 Agregado
+                'precio_compra',
                 'isv',
                 'stock',
                 'codigo_barras',
@@ -64,7 +74,6 @@ class Dashboard extends Page implements HasTable
             ])
             ->whereIn('usuario_id', $idsPermitidos)
             ->where('stock', '>', 0);
-
 
         // Accesorios
         $accesorios = DB::table('accesorios')
@@ -74,7 +83,7 @@ class Dashboard extends Page implements HasTable
                 DB::raw("'accesorio' as tipo"),
                 'nombre',
                 'precio_venta',
-                'precio_compra', // 👈 Agregado
+                'precio_compra',
                 'isv',
                 'stock',
                 'codigo_barras',
@@ -82,7 +91,6 @@ class Dashboard extends Page implements HasTable
             ])
             ->whereIn('created_by', $idsPermitidos)
             ->where('stock', '>', 0);
-
 
         // Unión
         $union = $telefonos->unionAll($accesorios);
@@ -319,8 +327,13 @@ class Dashboard extends Page implements HasTable
         }
 
         try {
+            /** @var \App\Models\User $authUser */
             $authUser = Auth::user();
-            $empresaUserId = $authUser->role_id === 3 ? $authUser->created_by : $authUser->id;
+            // Nueva lógica: si es vendedor, la empresa se toma directamente del encargado
+            $empresaUserId = $authUser->hasRole('Vendedor')
+                ? $authUser->created_by
+                : $authUser->id;
+
 
             $empresa = \App\Models\DatosEmpresa::where('user_id', $empresaUserId)->first();
             if (! $empresa) {
@@ -387,6 +400,35 @@ class Dashboard extends Page implements HasTable
                     'total' => $total,
                     'costo' => $item['costo'] ?? 0,
                 ]);
+                //aca sirve
+                // Actualizar stock según tipo de producto
+                switch ($item['tipo']) {
+                    case 'telefono':
+                        $telefono = \App\Models\Telefono::find($item['id']);
+                        if ($telefono) {
+                            $telefono->stock -= $item['cantidad'];
+                            $telefono->save(); // Dispara el observer
+                        } else {
+                            logger()->error("❌ Teléfono no encontrado. ID: {$item['id']}");
+                        }
+
+                        $accesorios = \App\Models\AccesorioTelefono::where('telefono_id', $item['id'])->get();
+                        foreach ($accesorios as $accesorio) {
+                            $nuevoStock = max(0, $accesorio->stock - $item['cantidad']);
+                            $accesorio->update(['stock' => $nuevoStock]);
+                        }
+                        break;
+
+                    case 'accesorio':
+                        $accesorio = \App\Models\Accesorio::find($item['id']);
+                        if ($accesorio) {
+                            $accesorio->stock -= $item['cantidad'];
+                            $accesorio->save(); // Dispara el observer
+                        } else {
+                            logger()->error("❌ Accesorio no encontrado. ID: {$item['id']}");
+                        }
+                        break;
+                }
             }
 
             // Limpiar carrito

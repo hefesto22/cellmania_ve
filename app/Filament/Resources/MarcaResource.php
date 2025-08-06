@@ -21,6 +21,7 @@ class MarcaResource extends Resource
     protected static ?string $navigationLabel = 'Marcas';
     protected static ?string $pluralModelLabel = 'Marcas';
     protected static ?string $modelLabel = 'Marca';
+    protected static ?string $navigationGroup = 'Marcas y Categorias';
 
     public static function form(Form $form): Form
     {

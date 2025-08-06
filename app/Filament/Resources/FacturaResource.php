@@ -27,6 +27,7 @@ class FacturaResource extends Resource
     protected static ?string $navigationLabel = 'Facturas';
     protected static ?string $modelLabel = 'Factura';
     protected static ?string $pluralModelLabel = 'Facturas';
+    protected static ?string $navigationGroup = 'Finanzas';
 
     public static function form(Form $form): Form
     {
@@ -74,25 +75,43 @@ class FacturaResource extends Resource
             'edit' => Pages\EditFactura::route('/{record}/edit'),
         ];
     }
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
-        $auth = Auth::user();
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
 
-        // Admin y Supervisor ven todo
-        if (in_array($auth->role_id, [1, 2])) {
-            return parent::getEloquentQuery();
+        if ($user->hasRole('super_admin')) {
+            return parent::getEloquentQuery(); // super_admin ve todo
         }
 
-        // Encargado: ve lo suyo + lo de sus registrados
-        if ($auth->role_id === 3) {
-            $userIds = \App\Models\User::where('created_by', $auth->id)
-                ->pluck('id')
-                ->push($auth->id);
+        if ($user->hasRole('Jefe')) {
+            // Jefe ve: él mismo + encargados + vendedores de sus encargados
+            $encargados = User::where('created_by', $user->id)->pluck('id');
+            $vendedores = User::whereIn('created_by', $encargados)->pluck('id');
+
+            $userIds = collect([$user->id])
+                ->merge($encargados)
+                ->merge($vendedores)
+                ->unique();
 
             return parent::getEloquentQuery()->whereIn('user_id', $userIds);
         }
 
-        // Otros roles: solo lo suyo
-        return parent::getEloquentQuery()->where('user_id', $auth->id);
+        if ($user->hasRole('Encargado')) {
+            // Encargado ve: él mismo + sus vendedores
+            $vendedores = User::where('created_by', $user->id)->pluck('id');
+
+            $userIds = collect([$user->id])->merge($vendedores);
+
+            return parent::getEloquentQuery()->whereIn('user_id', $userIds);
+        }
+
+        if ($user->hasRole('Vendedor')) {
+            // Vendedor solo ve lo suyo
+            return parent::getEloquentQuery()->where('user_id', $user->id);
+        }
+
+        // Cualquier otro rol por defecto solo ve lo suyo
+        return parent::getEloquentQuery()->where('user_id', $user->id);
     }
 }

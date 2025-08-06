@@ -26,6 +26,7 @@ class DatosEmpresaResource extends Resource
     protected static ?string $navigationLabel = 'Datos de la Empresa';
     protected static ?string $modelLabel = 'Datos de la Empresa';
     protected static ?string $pluralModelLabel = 'Datos de la Empresa';
+    protected static ?string $navigationGroup = 'Empresa y Usuarios';
 
     public static function form(Form $form): Form
     {

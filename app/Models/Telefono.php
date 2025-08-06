@@ -59,4 +59,5 @@ class Telefono extends Model
     {
         return $this->hasMany(\App\Models\AccesorioTelefono::class);
     }
+
 }

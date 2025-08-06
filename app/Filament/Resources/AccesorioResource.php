@@ -12,6 +12,8 @@ use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Marca;
 use App\Models\Categoria;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Forms\Components\Select;
 
 
 class AccesorioResource extends Resource
@@ -21,12 +23,13 @@ class AccesorioResource extends Resource
     protected static ?string $navigationLabel = 'Accesorios';
     protected static ?string $pluralModelLabel = 'Accesorios';
     protected static ?string $modelLabel = 'Accesorio';
+    protected static ?string $navigationGroup = 'Productos';
 
     public static function form(Form $form): Form
     {
         return $form->schema([
             Forms\Components\TextInput::make('nombre')->required(),
-            Forms\Components\TextInput::make('codigo_barras')->required()->unique(ignoreRecord: true),
+
             Forms\Components\Select::make('marca_id')
                 ->label('Marca')
                 ->options(function () {
@@ -58,15 +61,19 @@ class AccesorioResource extends Resource
                 ->default(0.00)
                 ->required(),
 
-            Forms\Components\TextInput::make('stock')->numeric()->default(0),
-            Forms\Components\Select::make('estado')
+            Forms\Components\TextInput::make('stock')->numeric()->default(1),
+            Select::make('estado')
+                ->label('Estado')
+                ->required()
                 ->options([
                     'Disponible' => 'Disponible',
                     'Vendido' => 'Vendido',
+                    'Reservado' => 'Reservado',
                     'Inactivo' => 'Inactivo',
                 ])
-                ->default('Disponible')
-                ->required(),
+                ->visible(fn() => request()->routeIs('filament.admin.resources.telefonos.edit')),
+
+            Forms\Components\TextInput::make('codigo_barras')->required()->unique(ignoreRecord: true),
 
             Forms\Components\Hidden::make('created_by')
                 ->default(fn() => Auth::user()?->id)
@@ -100,6 +107,39 @@ class AccesorioResource extends Resource
                     ->label('Creado por')
                     ->sortable(),
             ])
+            ->filters([
+                SelectFilter::make('estado')
+                    ->label('Estado')
+                    ->options([
+                        'Disponible' => 'Disponible',
+                        'Vendido' => 'Vendido',
+                        'Reservado' => 'Reservado',
+                        'Inactivo' => 'Inactivo',
+                    ]),
+
+                SelectFilter::make('encargado')
+                    ->label('Filtrar por Encargado')
+                    ->visible(function () {
+                        /** @var \App\Models\User $user */
+                        $user = Auth::user();
+                        return $user->hasRole('Jefe');
+                    })
+                    ->options(function () {
+                        $user = Auth::user();
+                        return \App\Models\User::where('created_by', $user->id)
+                            ->whereHas('roles', fn($q) => $q->where('name', 'Encargado'))
+                            ->pluck('name', 'id');
+                    })
+                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, $state) {
+                        if (blank($state)) {
+                            return $query; // Mostrar todos si no hay filtro
+                        }
+
+                        return $query->where('created_by', $state);
+                    }),
+
+            ])
+
             ->defaultSort('nombre');
     }
 
@@ -125,6 +165,18 @@ class AccesorioResource extends Resource
             ->pluck('id')
             ->push($auth->id);
 
-        return parent::getEloquentQuery()->whereIn('created_by', $userIds);
+        $query = parent::getEloquentQuery()->whereIn('created_by', $userIds);
+
+        // ✅ Detectar si se está filtrando por estado
+        $filters = request()->input('tableFilters', []);
+        $filtradoPorEstado = isset($filters['estado']) && !empty($filters['estado']);
+
+
+        // ✅ Ocultar los accesorios vendidos si no se está filtrando por estado
+        if (! $filtradoPorEstado) {
+            $query->where('estado', '!=', 'Vendido');
+        }
+
+        return $query;
     }
 }
